@@ -15,7 +15,7 @@
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "https://bbmannex.giftedtech.web.id"
+          "value": "https://bbm.giftedtech.co.ke"
         },
         {
           "key": "Access-Control-Allow-Methods",
