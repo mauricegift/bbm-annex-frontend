@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { compressImage, compressThumbnail } from './imageCompression';
 
-const GITHUB_CDN_URL = 'https://ghbcdn.giftedtech.co.ke/api/upload.php';
+const GITHUB_CDN_URL = 'https://sbecdn.giftedtech.co.ke/api/upload.php';
 
 // Check if device is mobile
 const isMobileDevice = (): boolean => {
