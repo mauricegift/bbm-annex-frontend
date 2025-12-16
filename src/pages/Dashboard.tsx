@@ -75,7 +75,7 @@ const Dashboard: React.FC = () => {
     {
       title: 'Available Notes',
       value: dashboardData?.stats?.available_notes || 0,
-      description: `For Year ${user?.year_of_study}`,
+      description: `Total notes`,
       icon: BookOpen,
       link: '/notes',
       delay: '0ms',
@@ -83,7 +83,7 @@ const Dashboard: React.FC = () => {
     {
       title: 'Available Papers',
       value: dashboardData?.stats?.available_papers || 0,
-      description: `For Year ${user?.year_of_study}`,
+      description: `Total pastpapers`,
       icon: FileText,
       link: '/past-papers',
       delay: '100ms',
