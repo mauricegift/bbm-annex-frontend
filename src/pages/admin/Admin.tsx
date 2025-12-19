@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { adminAPI, blogAPI, notesAPI, pastPapersAPI, reviewsAPI } from '../../lib/api';
 import { uploadToGithubCdn } from '../../lib/githubCdn';
@@ -77,6 +77,19 @@ const Admin: React.FC = () => {
 
 const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Get initial tab from URL or default to 'pending'
+  const validTabs = ['pending', 'notes', 'papers', 'users', 'blog'];
+  const urlTab = searchParams.get('tab');
+  const initialTab = urlTab && validTabs.includes(urlTab) ? urlTab : 'pending';
+  const [activeTab, setActiveTab] = useState(initialTab);
+  
+  // Update URL when tab changes
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    setSearchParams({ tab: value });
+  };
   
   // Pending approvals state
   const [pendingNotes, setPendingNotes] = useState<any[]>([]);
@@ -711,9 +724,18 @@ const AdminDashboard: React.FC = () => {
       });
     } catch (error: any) {
       console.error('Note update error:', error);
+      const errorDetail = error.response?.data?.detail;
+      let errorMessage = "Failed to update note";
+      if (typeof errorDetail === 'string') {
+        errorMessage = errorDetail;
+      } else if (Array.isArray(errorDetail)) {
+        errorMessage = errorDetail.map((e: any) => e.msg || e.message || JSON.stringify(e)).join(', ');
+      } else if (errorDetail && typeof errorDetail === 'object') {
+        errorMessage = errorDetail.msg || errorDetail.message || JSON.stringify(errorDetail);
+      }
       toast({
         title: "Update failed",
-        description: error.response?.data?.detail || "Failed to update note",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -745,9 +767,18 @@ const AdminDashboard: React.FC = () => {
       });
     } catch (error: any) {
       console.error('Paper update error:', error);
+      const errorDetail = error.response?.data?.detail;
+      let errorMessage = "Failed to update paper";
+      if (typeof errorDetail === 'string') {
+        errorMessage = errorDetail;
+      } else if (Array.isArray(errorDetail)) {
+        errorMessage = errorDetail.map((e: any) => e.msg || e.message || JSON.stringify(e)).join(', ');
+      } else if (errorDetail && typeof errorDetail === 'object') {
+        errorMessage = errorDetail.msg || errorDetail.message || JSON.stringify(errorDetail);
+      }
       toast({
         title: "Update failed",
-        description: error.response?.data?.detail || "Failed to update paper",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -1179,7 +1210,7 @@ const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      <Tabs defaultValue="pending" className="space-y-4 sm:space-y-6">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 sm:space-y-6">
         <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 h-auto gap-1">
           <TabsTrigger value="pending" className="text-xs sm:text-sm px-2 py-1.5 sm:px-3 sm:py-2">Pending</TabsTrigger>
           <TabsTrigger value="notes" className="text-xs sm:text-sm px-2 py-1.5 sm:px-3 sm:py-2">Notes</TabsTrigger>
@@ -2733,7 +2764,7 @@ const AdminDashboard: React.FC = () => {
       course_code: note.course_code || '',
       year_of_study: note.year_of_study || 1,
       semester_of_study: note.semester_of_study || 1,
-      specialization: note.specialization || '',
+      specialization: note.specialization || 'COMMON',
       description: note.description || '',
       status: note.status || 'pending',
       feedback: note.feedback || '',
@@ -3060,7 +3091,7 @@ const AdminDashboard: React.FC = () => {
       course_code: paper.course_code || '',
       year_of_study: paper.year_of_study || 1,
       semester_of_study: paper.semester_of_study || 1,
-      specialization: paper.specialization || '',
+      specialization: paper.specialization || 'COMMON',
       description: paper.description || '',
       status: paper.status || 'pending',
       feedback: paper.feedback || '',
