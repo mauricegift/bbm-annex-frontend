@@ -126,7 +126,7 @@ const ResetPassword: React.FC = () => {
       await authAPI.forgotPassword(formData.email);
       toast({
         title: "Reset code resent!",
-        description: "Check your email again for the new reset code.",
+        description: "Check your email again for the new reset code. Check your spam folder if you don't see email in your inbox",
       });
       setResendCountdown(60);
     } catch (error: any) {
