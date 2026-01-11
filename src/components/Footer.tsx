@@ -95,7 +95,7 @@ const Footer: React.FC = () => {
             <ul className="space-y-2">
               <li>
                 <a 
-                  href="mailto:support@bbmannex.com" 
+                  href="mailto:bbm@giftedtech.co.ke" 
                   className="text-sm text-muted-foreground hover:text-primary hover:translate-x-1 transition-all duration-200 flex items-center gap-2"
                 >
                   <Mail className="w-4 h-4" />
@@ -128,7 +128,7 @@ const Footer: React.FC = () => {
               </li>
               <li>
                 <a 
-                  href="https://whatsapp.com/channel/0029Vb3hlgX5kg7G0nFggl0Y" 
+                  href="https://wa.me/message/OCSOK3IUFPWWA1" 
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-muted-foreground hover:text-primary hover:translate-x-1 transition-all duration-200 flex items-center gap-2"
