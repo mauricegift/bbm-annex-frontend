@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { toast } from '../../lib/toast';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -9,7 +10,6 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Eye, EyeOff, AlertCircle, Mail, Smartphone, Check, X } from 'lucide-react';
 import { Checkbox } from '../../components/ui/checkbox';
 import { USER_SPECIALIZATIONS } from '../../lib/specializations';
-import { Progress } from '../../components/ui/progress';
 
 // Password strength calculator
 const calculatePasswordStrength = (password: string): { score: number; label: string; color: string } => {
@@ -105,8 +105,9 @@ const Register: React.FC = () => {
       newErrors.push('Please select your specialization for Year 3 and above');
     }
 
-    if (formData.verification_method === 'sms' && !formData.phone_number) {
-      newErrors.push('Phone number is required for SMS verification');
+    // Phone number is always required regardless of verification method
+    if (!formData.phone_number) {
+      newErrors.push('Phone number is required');
     }
 
     if (formData.phone_number && !/^(07|01)[0-9]{8}$/.test(formData.phone_number)) {
@@ -118,6 +119,26 @@ const Register: React.FC = () => {
     }
 
     return newErrors;
+  };
+
+  const handleVerificationMethodChange = (value: string) => {
+    if (value === 'sms') {
+      toast({
+        title: "SMS Verification Unavailable",
+        description: "SMS API is currently down. Please use email verification instead.",
+        variant: "destructive",
+      });
+      // Force email verification method
+      setFormData({
+        ...formData,
+        verification_method: 'email'
+      });
+    } else {
+      setFormData({
+        ...formData,
+        verification_method: value as 'email' | 'sms'
+      });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -132,7 +153,8 @@ const Register: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await register({
+      // Ensure verification method is always email
+      const registrationData = {
         username: formData.username,
         email: formData.email,
         name: formData.name,
@@ -140,10 +162,17 @@ const Register: React.FC = () => {
         year_of_study: parseInt(formData.year_of_study),
         semester_of_study: parseInt(formData.semester_of_study),
         specialization: formData.specialization || undefined,
-        verification_method: formData.verification_method,
-        phone_number: formData.phone_number || undefined,
+        verification_method: 'email' as const, // Force email verification
+        phone_number: formData.phone_number || '', // Phone is required even for email verification
+      };
+      
+      await register(registrationData);
+      navigate('/verify', { 
+        state: { 
+          email: formData.email, 
+          verification_method: 'email' // Always email
+        } 
       });
-      navigate('/verify', { state: { email: formData.email, verification_method: formData.verification_method } });
     } catch (error) {
       // Error handled by AuthContext
     } finally {
@@ -304,6 +333,34 @@ const Register: React.FC = () => {
                 </div>
               </div>
 
+              {/* Phone Number field (always required) */}
+              <div className="space-y-2">
+                <Label htmlFor="phone_number" className="text-sm font-medium text-foreground/90">Phone Number *</Label>
+                <div className="relative group">
+                  <Input
+                    id="phone_number"
+                    name="phone_number"
+                    type="tel"
+                    placeholder="0712345678"
+                    value={formData.phone_number}
+                    onChange={handleChange}
+                    onFocus={() => setFocusedField('phone')}
+                    onBlur={() => setFocusedField(null)}
+                    required
+                    className={`h-12 transition-all duration-300 border-2 bg-background/50 backdrop-blur-sm ${
+                      focusedField === 'phone' 
+                        ? 'border-primary/50 ring-4 ring-primary/10' 
+                        : 'border-border/50 hover:border-primary/30'
+                    }`}
+                  />
+                  <div className={`absolute inset-0 rounded-md transition-all duration-300 pointer-events-none ${
+                    focusedField === 'phone' ? 'bg-primary/5' : ''
+                  }`}></div>
+                  <Smartphone className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                </div>
+                <p className="text-xs text-muted-foreground">Enter a valid Kenyan phone number (required for account verification)</p>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-foreground/90">Year of Study *</Label>
@@ -369,7 +426,7 @@ const Register: React.FC = () => {
                 <Label className="text-sm font-medium text-foreground/90">Verification Method *</Label>
                 <Select 
                   value={formData.verification_method} 
-                  onValueChange={(value) => handleSelectChange('verification_method', value)}
+                  onValueChange={handleVerificationMethodChange}
                 >
                   <SelectTrigger className="h-12 transition-all duration-300 border-2 bg-background backdrop-blur-sm border-border/50 hover:border-primary/30">
                     <SelectValue placeholder="Select verification method" />
@@ -379,48 +436,28 @@ const Register: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <Mail className="w-4 h-4" />
                         <span>Email Verification</span>
+                        <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
+                          Recommended
+                        </span>
                       </div>
                     </SelectItem>
-                    <SelectItem value="sms" className="cursor-pointer">
+                    <SelectItem value="sms" className="cursor-pointer opacity-50">
                       <div className="flex items-center gap-2">
                         <Smartphone className="w-4 h-4" />
-                        <span>SMS Verification</span>
+                        <span className="flex items-center gap-2">
+                          SMS Verification
+                          <span className="text-xs bg-destructive/20 text-destructive px-2 py-0.5 rounded-full">
+                            Temporarily Unavailable
+                          </span>
+                        </span>
                       </div>
                     </SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  We'll send a 6-digit code to verify your account
+                  Verification code will be sent to your email. Phone number is required for account security.
                 </p>
               </div>
-
-              {/* Phone Number field for SMS verification */}
-              {formData.verification_method === 'sms' && (
-                <div className="space-y-2 animate-fade-in">
-                  <Label htmlFor="phone_number" className="text-sm font-medium text-foreground/90">Phone Number *</Label>
-                  <div className="relative group">
-                    <Input
-                      id="phone_number"
-                      name="phone_number"
-                      type="tel"
-                      placeholder="0712345678"
-                      value={formData.phone_number}
-                      onChange={handleChange}
-                      onFocus={() => setFocusedField('phone')}
-                      onBlur={() => setFocusedField(null)}
-                      className={`h-12 transition-all duration-300 border-2 bg-background/50 backdrop-blur-sm ${
-                        focusedField === 'phone' 
-                          ? 'border-primary/50 ring-4 ring-primary/10' 
-                          : 'border-border/50 hover:border-primary/30'
-                      }`}
-                    />
-                    <div className={`absolute inset-0 rounded-md transition-all duration-300 pointer-events-none ${
-                      focusedField === 'phone' ? 'bg-primary/5' : ''
-                    }`}></div>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Enter a valid Kenyan phone number</p>
-                </div>
-              )}
 
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-sm font-medium text-foreground/90">Password *</Label>
