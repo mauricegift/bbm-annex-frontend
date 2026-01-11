@@ -173,7 +173,7 @@ const ResetPassword: React.FC = () => {
                 Reset Password
               </h1>
               <p className="text-muted-foreground text-sm animate-fade-in delay-100">
-                Enter your reset code and new password
+                Enter your reset code and new password. Check your spam folder if you don't see email in your inbox
               </p>
             </div>
         </div>
