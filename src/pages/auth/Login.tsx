@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -7,10 +7,22 @@ import { Label } from '../../components/ui/label';
 import { Card, CardContent } from '../../components/ui/card';
 import { Checkbox } from '../../components/ui/checkbox';
 import { Eye, EyeOff } from 'lucide-react';
+import { toast } from '../../lib/toast';
 
 const Login: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const verified = searchParams.get('verified');
+    if (verified === 'true') {
+      toast({
+        title: 'Email verified!',
+        description: 'Your account has been verified. You can now sign in.',
+      });
+    }
+  }, []);
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -94,13 +106,13 @@ const Login: React.FC = () => {
           <CardContent className="p-6 space-y-4">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2 animate-fade-in-up delay-100">
-                <Label htmlFor="username" className="text-sm font-medium text-foreground/90">Username</Label>
+                <Label htmlFor="username" className="text-sm font-medium text-foreground/90">Username or Email</Label>
                 <div className="relative group">
                   <Input
                     id="username"
                     name="username"
                     type="text"
-                    placeholder="Enter your username"
+                    placeholder="Enter your username or email"
                     value={formData.username}
                     onChange={handleChange}
                     onFocus={() => setFocusedField('username')}
