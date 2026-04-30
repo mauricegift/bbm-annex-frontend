@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 export const api = axios.create({
-  baseURL: '/api', // I use my backend_api_url in vercel.json so the app will appear as a fullstack app
+  baseURL: '/api',
   timeout: 120000,
   headers: {
     'Content-Type': 'application/json',
@@ -9,7 +9,6 @@ export const api = axios.create({
   withCredentials: true,
 });
 
-// Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('authToken');
@@ -18,9 +17,7 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 let onAuthError: (() => void) | null = null;
@@ -28,7 +25,6 @@ export function setAuthErrorHandler(handler: () => void) {
   onAuthError = handler;
 }
 
-// Response interceptor to handle auth errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -41,34 +37,35 @@ api.interceptors.response.use(
   }
 );
 
-// Auth API
 export const authAPI = {
+  checkFirstUser: () => api.get('/auth/check-first-user'),
+
   register: (userData: {
-    username: string;
-    email: string;
-    name: string;
-    password: string;
-    year_of_study: number;
-    semester_of_study: number;
-    specialization?: string;
-    verification_method: 'email' | 'sms';
-    phone_number?: string;
+    username: string; email: string; name: string; password: string;
+    year_of_study: number; semester_of_study: number; group?: string;
+    specialization?: string; verification_method: 'email' | 'sms'; phone_number?: string;
   }) => api.post('/auth/register', userData),
 
   login: (credentials: { login: string; password: string; remember_me?: boolean }) =>
     api.post('/auth/login', credentials),
 
-  verify: (data: { email: string; code: string }) =>
-    api.post('/auth/verify', data),
+  verifySms: (data: { identifier: string; code: string }) =>
+    api.post('/auth/verify-sms', data),
 
-  resendVerification: (email: string) =>
-    api.post(`/auth/resend-verification?email=${encodeURIComponent(email)}`),
+  resendVerification: (email: string, forceEmail = false) =>
+    api.post(`/auth/resend-verification?email=${encodeURIComponent(email)}&force_email=${forceEmail}`),
 
   forgotPassword: (emailOrPhone: string) =>
     api.post('/auth/forgot-password', { email_or_phone: emailOrPhone }),
 
-  resetPassword: (data: { email_or_phone: string; code: string; new_password: string }) =>
-    api.post('/auth/reset-password', data),
+  resetPasswordLink: (data: { token: string; new_password: string }) =>
+    api.post('/auth/reset-password-link', data),
+
+  resetPasswordSms: (data: { phone_number: string; code: string; new_password: string }) =>
+    api.post('/auth/reset-password-sms', data),
+
+  updatePhoneBeforeVerify: (email: string, phone_number: string) =>
+    api.post(`/auth/update-phone?email=${encodeURIComponent(email)}`, { phone_number }),
 
   requestAccountDeletion: (verificationMethod: 'email' | 'sms') =>
     api.post(`/auth/request-account-deletion?verification_method=${verificationMethod}`),
@@ -77,7 +74,10 @@ export const authAPI = {
     api.post('/auth/confirm-account-deletion', data),
 };
 
-// Reviews API
+export const groupsAPI = {
+  getGroups: () => api.get('/groups'),
+};
+
 export const reviewsAPI = {
   addNoteReview: (noteId: string, data: { content: string; rating: number }) =>
     api.post(`/notes/${noteId}/review`, data),
@@ -91,7 +91,6 @@ export const reviewsAPI = {
   deleteNoteReview: (noteId: string, reviewId: string) => api.delete(`/notes/${noteId}/reviews/${reviewId}`),
   deletePaperReview: (paperId: string, reviewId: string) => api.delete(`/past-papers/${paperId}/reviews/${reviewId}`),
   deleteBlogReview: (blogId: string, reviewId: string) => api.delete(`/blogs/${blogId}/reviews/${reviewId}`),
-  // Admin review moderation
   replyToNoteReview: (noteId: string, reviewId: string, reply: string) =>
     api.post(`/notes/${noteId}/reviews/${reviewId}/reply`, { reply }),
   replyToPaperReview: (paperId: string, reviewId: string, reply: string) =>
@@ -112,113 +111,100 @@ export const reviewsAPI = {
     api.post(`/blogs/${blogId}/reviews/${reviewId}/approve`),
 };
 
-// User API
 export const userAPI = {
   getProfile: () => api.get('/user/profile'),
   updateProfile: (data: {
-    name: string;
-    year_of_study: number;
-    semester_of_study: number;
-    specialization?: string;
-  }) => api.put('/user/profile', { profile: data }),
-  updateProfilePicture: (profile_picture_url: string) =>
-    api.post('/user/update-profile-picture', new URLSearchParams({ profile_picture_url }), {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    }),
+    name: string; year_of_study: number; semester_of_study: number;
+    group?: string; specialization?: string;
+  }) => api.put('/user/profile', data),
+  updateProfilePicture: (profile_picture: string) =>
+    api.post('/user/update-profile-picture', { profile_picture }),
 };
 
-// Dashboard API
 export const dashboardAPI = {
   getDashboard: () => api.get('/dashboard'),
 };
 
-// Notes API
 export const notesAPI = {
-  getNotes: (params?: { year?: number; semester?: number; specialization?: string; search?: string; page?: number; limit?: number }) =>
+  getNotes: (params?: { year?: number; semester?: number; specialization?: string; group?: string; search?: string; page?: number; limit?: number }) =>
     api.get('/notes', { params }),
   getNote: (id: string) => api.get(`/notes/${id}`),
   viewNote: (id: string) => api.get(`/notes/view/${id}`, { responseType: 'blob' }),
   getMyUploads: (params?: { page?: number; limit?: number }) => api.get('/notes/my-uploads', { params }),
   uploadNote: (data: {
-    course_title: string;
-    course_code: string;
-    year_of_study: number;
-    semester_of_study: number;
-    specialization?: string;
-    file_url: string;
-    thumbnail_url?: string;
-    description?: string;
+    course_title: string; course_code: string; year_of_study: number;
+    semester_of_study: number; group?: string; specialization?: string;
+    file_url: string; thumbnail_url?: string; description?: string;
   }) => api.post('/notes/upload', data),
   deleteNote: (id: string) => api.delete(`/notes/${id}`),
 };
 
-// Past Papers API
 export const pastPapersAPI = {
-  getPastPapers: (params?: { year?: number; semester?: number; specialization?: string; search?: string; page?: number; limit?: number }) =>
+  getPastPapers: (params?: { year?: number; semester?: number; specialization?: string; group?: string; search?: string; page?: number; limit?: number }) =>
     api.get('/past-papers', { params }),
   getPastPaper: (id: string) => api.get(`/past-papers/${id}`),
   viewPastPaper: (id: string) => api.get(`/past-papers/view/${id}`, { responseType: 'blob' }),
   getMyPapers: (params?: { page?: number; limit?: number }) => api.get('/past-papers/my-uploads', { params }),
   uploadPaper: (data: {
-    course_title: string;
-    course_code: string;
-    year_of_study: number;
-    semester_of_study: number;
-    specialization?: string;
-    file_url: string;
-    thumbnail_url?: string;
-    description?: string;
+    course_title: string; course_code: string; year_of_study: number;
+    semester_of_study: number; group?: string; specialization?: string;
+    file_url: string; thumbnail_url?: string; description?: string;
   }) => api.post('/past-papers/upload', data),
   deletePaper: (id: string) => api.delete(`/past-papers/${id}`),
 };
 
-// Admin API
 export const adminAPI = {
-  getUsers: (params?: { page?: number; limit?: number; search?: string }) => 
+  getUsers: (params?: { page?: number; limit?: number; search?: string; role?: string; status?: string }) =>
     api.get('/admin/users', { params }),
   updateUser: (id: string, data: any) => api.put(`/admin/users/${id}`, data),
   deleteUser: (id: string) => api.delete(`/admin/users/${id}`),
-  
-  getPendingNotes: (params?: { page?: number; limit?: number }) => 
+
+  getPendingNotes: (params?: { page?: number; limit?: number }) =>
     api.get('/admin/notes/pending', { params }),
   updateNoteStatus: (id: string, data: { status: string; feedback?: string }) =>
     api.put(`/admin/notes/${id}`, data),
   updateNote: (id: string, data: any) => api.put(`/admin/notes/${id}/edit`, data),
-  
-  getPendingPapers: (params?: { page?: number; limit?: number }) => 
+
+  getPendingPapers: (params?: { page?: number; limit?: number }) =>
     api.get('/admin/past-papers/pending', { params }),
   updatePaperStatus: (id: string, data: { status: string; feedback?: string }) =>
     api.put(`/admin/past-papers/${id}`, data),
   updatePaper: (id: string, data: any) => api.put(`/admin/past-papers/${id}/edit`, data),
-    
-  createBlog: (data: { title: string; content: string; thumbnail_url?: string }) =>
+
+  createBlog: (data: { title: string; content: string; thumbnail_url?: string; target_group?: string }) =>
     api.post('/admin/blogs', data),
-  updateBlog: (id: string, data: { title: string; content: string; thumbnail_url?: string }) =>
+  updateBlog: (id: string, data: { title: string; content: string; thumbnail_url?: string; target_group?: string }) =>
     api.put(`/admin/blogs/${id}`, data),
   deleteBlog: (id: string) => api.delete(`/admin/blogs/${id}`),
-  
-  // New endpoints for managing all notes and papers
-  getAllNotes: (params?: { page?: number; limit?: number; search?: string }) => 
+
+  getAllNotes: (params?: { page?: number; limit?: number; search?: string; group?: string; specialization?: string; year?: number; semester?: number }) =>
     api.get('/notes', { params }),
-  getAllPapers: (params?: { page?: number; limit?: number; search?: string }) => 
+  getAllPapers: (params?: { page?: number; limit?: number; search?: string; group?: string; specialization?: string; year?: number; semester?: number }) =>
     api.get('/past-papers', { params }),
   deleteNote: (id: string) => api.delete(`/notes/${id}`),
   deletePaper: (id: string) => api.delete(`/past-papers/${id}`),
+
+  getGroups: () => api.get('/admin/groups'),
+  createGroup: (data: { name: string; code: string; description?: string; specializations?: string[] }) =>
+    api.post('/admin/groups', data),
+  updateGroup: (groupId: string, data: { name?: string; description?: string }) =>
+    api.put(`/admin/groups/${groupId}`, data),
+  deleteGroup: (groupId: string) => api.delete(`/admin/groups/${groupId}`),
+  addSpecialization: (groupId: string, name: string) =>
+    api.post(`/admin/groups/${groupId}/specializations`, { name }),
+  removeSpecialization: (groupId: string, specName: string) =>
+    api.delete(`/admin/groups/${groupId}/specializations/${encodeURIComponent(specName)}`),
 };
 
-// Blog API
 export const blogAPI = {
-  getBlogs: (params?: { page?: number; limit?: number; search?: string }) => 
+  getBlogs: (params?: { page?: number; limit?: number; search?: string }) =>
     api.get('/blogs', { params }),
   getBlog: (id: string) => api.get(`/blogs/${id}`),
 };
 
-// Profile API updates
 export const profileAPI = {
-  updateProfilePicture: (profile_picture_url: string) =>
-    api.post('/user/update-profile-picture', new URLSearchParams({ profile_picture_url }), {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    }),
+  updateProfilePicture: (profile_picture: string) =>
+    api.post('/user/update-profile-picture', { profile_picture }),
   changePassword: (data: { current_password: string; new_password: string }) =>
     api.put('/user/change-password', data),
   deleteAccount: (data: { email: string; code: string }) =>
