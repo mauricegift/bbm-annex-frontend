@@ -111,13 +111,46 @@ const PastPapersMain: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [activeYear, setActiveYear] = useState(user?.year_of_study || 1);
-  
+  const [mainTab, setMainTab] = useState('browse');
+  const [myUploads, setMyUploads] = useState<PastPaper[]>([]);
+  const [isLoadingMyUploads, setIsLoadingMyUploads] = useState(false);
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+
   // Pagination state
   const [pagination, setPagination] = useState({ page: 1, total: 0, hasNext: false });
 
   useEffect(() => {
     fetchPapers();
   }, [filters, currentPage, activeYear]);
+
+  useEffect(() => {
+    if (mainTab === 'my-uploads') fetchMyUploads();
+  }, [mainTab]);
+
+  const fetchMyUploads = async () => {
+    setIsLoadingMyUploads(true);
+    try {
+      const response = await pastPapersAPI.getMyPapers({ limit: 50 });
+      setMyUploads(response.data?.data || response.data || []);
+    } catch {
+    } finally {
+      setIsLoadingMyUploads(false);
+    }
+  };
+
+  const handleDeleteMyPaper = async (paperId: string) => {
+    if (!confirm('Are you sure you want to delete this past paper?')) return;
+    setDeletingIds(prev => new Set(prev).add(paperId));
+    try {
+      await pastPapersAPI.deletePaper(paperId);
+      setMyUploads(prev => prev.filter(p => p.id !== paperId));
+      toast({ title: 'Paper deleted', description: 'Your past paper has been deleted.' });
+    } catch (error: any) {
+      toast({ title: 'Delete failed', description: error.response?.data?.detail || 'Could not delete paper.', variant: 'destructive' });
+    } finally {
+      setDeletingIds(prev => { const s = new Set(prev); s.delete(paperId); return s; });
+    }
+  };
 
   const fetchPapers = async (page = 1) => {
     try {
@@ -300,6 +333,70 @@ const PastPapersMain: React.FC = () => {
         </div>
       </div>
 
+      {/* Main Tabs: Browse / My Uploads */}
+      <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2 max-w-xs">
+          <TabsTrigger value="browse">Browse</TabsTrigger>
+          <TabsTrigger value="my-uploads">My Uploads</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="my-uploads">
+          {isLoadingMyUploads ? (
+            <div className="flex justify-center items-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+          ) : myUploads.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">No past papers uploaded</h3>
+                <p className="text-muted-foreground mb-4">Upload past papers to see them here</p>
+                <Button asChild><Link to="/past-papers/upload">Upload Paper</Link></Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {myUploads.map(paper => (
+                <Card key={paper.id} className={`border ${paper.status === 'rejected' ? 'border-destructive/40 bg-destructive/5' : paper.status === 'pending' ? 'border-yellow-400/40 bg-yellow-50/30 dark:bg-yellow-900/10' : 'border-border/60'}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-semibold text-sm">{paper.course_title}</h3>
+                          <Badge variant="secondary" className="text-xs">{paper.course_code}</Badge>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            paper.status === 'approved' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                            paper.status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                            'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                          }`}>
+                            {paper.status === 'approved' ? '✓ Approved' : paper.status === 'rejected' ? '✗ Rejected' : '⏳ Pending review'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">Year {paper.year_of_study}, Sem {paper.semester_of_study}{paper.exam_year ? ` • ${paper.exam_year}` : ''} • {new Date(paper.created_at).toLocaleDateString()}</p>
+                        {paper.feedback && (
+                          <div className={`mt-2 p-2.5 rounded-lg text-xs ${paper.status === 'rejected' ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400' : 'bg-muted border border-border/60 text-muted-foreground'}`}>
+                            <span className="font-semibold">Admin feedback:</span> {paper.feedback}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <Button
+                          size="sm"
+                          variant={paper.status === 'rejected' ? 'destructive' : 'outline'}
+                          onClick={() => handleDeleteMyPaper(paper.id)}
+                          disabled={deletingIds.has(paper.id)}
+                        >
+                          {deletingIds.has(paper.id) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="browse">
+
       {/* Year Tabs */}
       <Tabs value={`year-${activeYear}`} onValueChange={(value) => setActiveYear(parseInt(value.replace('year-', '')))} className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
@@ -446,6 +543,9 @@ const PastPapersMain: React.FC = () => {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+      </Tabs>
+
         </TabsContent>
       </Tabs>
     </div>
