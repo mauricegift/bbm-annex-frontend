@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { userAPI, authAPI, profileAPI } from '../lib/api';
-import { uploadToGithubCdn } from '../lib/githubCdn';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -16,7 +16,7 @@ import Cropper from 'react-easy-crop';
 import { Dialog, DialogContent } from '../components/ui/dialog';
 import getCroppedImg from '../lib/cropImage';
 import { isIOSDevice, logMobileUploadDebug } from '../utils/mobileUploadFix';
-import { USER_SPECIALIZATIONS } from '../lib/specializations';
+import { groupsAPI } from '../lib/api';
 
 const Profile: React.FC = () => {
   const { user, updateUser } = useAuth();
@@ -28,10 +28,12 @@ const Profile: React.FC = () => {
   const [activeTab, setActiveTab] = useState('info');
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  const [groups, setGroups] = useState<{id:string;code:string;name:string;specializations:string[]}[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     year_of_study: 1,
     semester_of_study: 1,
+    group: '',
     specialization: '',
   });
 
@@ -48,10 +50,15 @@ const Profile: React.FC = () => {
         name: user?.name || '',
         year_of_study: user?.year_of_study || 1,
         semester_of_study: user?.semester_of_study || 1,
+        group: (user as any)?.group || '',
         specialization: user?.specialization || '',
       });
     }
   }, [user]);
+
+  useEffect(() => {
+    groupsAPI.getGroups().then(r => setGroups(r.data || [])).catch(() => {});
+  }, []);
 
   const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -66,22 +73,13 @@ const Profile: React.FC = () => {
 
     setIsLoading(true);
     try {
-      // Build profile data, include specialization only for year 3+
-      const profileData: {
-        name: string;
-        year_of_study: number;
-        semester_of_study: number;
-        specialization?: string;
-      } = {
+      const profileData: Record<string, any> = {
         name: formData.name,
         year_of_study: formData.year_of_study,
         semester_of_study: formData.semester_of_study,
       };
-      
-      // Include specialization for year 3 and above
-      if (formData.year_of_study >= 3) {
-        profileData.specialization = formData.specialization || user?.specialization;
-      }
+      if (formData.group) profileData.group = formData.group;
+      if (formData.specialization) profileData.specialization = formData.specialization;
       
       const response = await userAPI.updateProfile(profileData);
       updateUser(response.data);
@@ -210,12 +208,17 @@ const Profile: React.FC = () => {
         });
         return;
       }
-      const croppedFile = new File([croppedBlob], croppingFile.name, { type: croppingFile.type });
-      const imageUrl = await uploadToGithubCdn(croppedFile, croppingFile.name, (progress) => {
-        setUploadProgress(progress);
+      setUploadProgress(50);
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(croppedBlob);
       });
-      const response = await userAPI.updateProfilePicture(imageUrl);
-      const updatedUser = { ...user, profile_picture: imageUrl };
+      setUploadProgress(80);
+      const response = await userAPI.updateProfilePicture(base64);
+      const updatedUser = { ...user, profile_picture: response.data?.profile_picture || base64 };
+      setUploadProgress(100);
       updateUser(updatedUser);
       toast({
         title: "Profile picture updated",
@@ -368,6 +371,7 @@ const Profile: React.FC = () => {
                           name: user?.name || '',
                           year_of_study: user?.year_of_study || 1,
                           semester_of_study: user?.semester_of_study || 1,
+                          group: (user as any)?.group || '',
                           specialization: user?.specialization || '',
                         });
                       }}>
@@ -425,10 +429,17 @@ const Profile: React.FC = () => {
                       className="hidden"
                     />
                   </div>
-                  <div>
+                  <div className="space-y-1">
                     <h3 className="font-medium">{user?.name}</h3>
                     <p className="text-sm text-muted-foreground">{user?.email}</p>
                     <p className="text-sm text-muted-foreground">@{user?.username}</p>
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                      user?.role === 'super_admin' ? 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800' :
+                      user?.role === 'admin' ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800' :
+                      'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800'
+                    }`}>
+                      {user?.role === 'super_admin' ? '⭐ Super Admin' : user?.role === 'admin' ? '🛡 Admin' : '🎓 Student'}
+                    </span>
                   </div>
                 </div>
 
@@ -513,41 +524,64 @@ const Profile: React.FC = () => {
                     </Select>
                   </div>
 
-                  {/* Show specialization - editable for year 3+ */}
-                  {(user?.specialization || (isEditing && formData.year_of_study >= 3)) && (
-                    <div className="space-y-2">
-                      <Label htmlFor="specialization">Specialization</Label>
-                      {isEditing && formData.year_of_study >= 3 ? (
-                        <Select
-                          value={formData.specialization}
-                          onValueChange={(value) => handleInputChange('specialization', value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select specialization" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {USER_SPECIALIZATIONS.map((spec) => (
-                              <SelectItem key={spec.value} value={spec.value}>
-                                {spec.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <>
+                  {/* Study Group - dynamic from admin */}
+                  <div className="space-y-2">
+                    <Label htmlFor="group">Study Group</Label>
+                    {isEditing && groups.length > 0 ? (
+                      <Select
+                        value={formData.group}
+                        onValueChange={(value) => {
+                          handleInputChange('group', value);
+                          handleInputChange('specialization', '');
+                        }}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Select study group" /></SelectTrigger>
+                        <SelectContent>
+                          {groups.map(g => (
+                            <SelectItem key={g.id} value={g.code}>{g.name} ({g.code})</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        value={isEditing
+                          ? (groups.length === 0 ? 'No groups added yet — ask admin' : (formData.group || 'Not set'))
+                          : ((user as any)?.group || 'Not set')}
+                        disabled
+                        className="bg-muted"
+                      />
+                    )}
+                  </div>
+
+                  {/* Specialization - dynamic from selected group */}
+                  {(() => {
+                    const selectedGroup = groups.find(g => g.code === (isEditing ? formData.group : (user as any)?.group));
+                    const specs = selectedGroup?.specializations || [];
+                    const displaySpec = isEditing ? formData.specialization : (user?.specialization || '');
+                    if (!isEditing && !displaySpec) return null;
+                    return (
+                      <div className="space-y-2">
+                        <Label htmlFor="specialization">Specialization</Label>
+                        {isEditing && specs.length > 0 ? (
+                          <Select
+                            value={formData.specialization}
+                            onValueChange={(value) => handleInputChange('specialization', value)}
+                          >
+                            <SelectTrigger><SelectValue placeholder="Select specialization" /></SelectTrigger>
+                            <SelectContent>
+                              {specs.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        ) : (
                           <Input
-                            id="specialization"
-                            value={user?.specialization || 'Not set'}
+                            value={displaySpec || 'Not set'}
                             disabled
                             className="bg-muted"
                           />
-                          {formData.year_of_study < 3 && (
-                            <p className="text-xs text-muted-foreground">Specialization available for year 3+</p>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </CardContent>
             </Card>
@@ -573,8 +607,16 @@ const Profile: React.FC = () => {
                   </div>
                   
                   <div className="space-y-2 p-4 rounded-lg bg-muted/50">
-                    <p className="text-sm font-medium text-muted-foreground">Account Type</p>
-                    <p className="font-medium">{user?.is_admin ? 'Administrator' : 'Student'}</p>
+                    <p className="text-sm font-medium text-muted-foreground">Account Role</p>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                        user?.role === 'super_admin' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' :
+                        user?.role === 'admin' ? 'bg-primary/10 text-primary' :
+                        'bg-muted text-muted-foreground'
+                      }`}>
+                        {user?.role === 'super_admin' ? '⭐ Super Admin' : user?.role === 'admin' ? '🛡 Admin' : '🎓 Student'}
+                      </span>
+                    </div>
                   </div>
                   
                   <div className="space-y-2 p-4 rounded-lg bg-muted/50">
@@ -675,7 +717,14 @@ const Profile: React.FC = () => {
                 <CardDescription>Permanently delete your account</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {!showDeleteConfirm ? (
+                {user?.role === 'super_admin' ? (
+                  <div className="p-4 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
+                    <p className="font-medium text-purple-800 dark:text-purple-300">Super Admin accounts cannot be deleted</p>
+                    <p className="text-sm text-purple-600 dark:text-purple-400 mt-1">
+                      The Super Admin account is protected and cannot be deleted to ensure the platform always has an administrator.
+                    </p>
+                  </div>
+                ) : !showDeleteConfirm ? (
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-4 sm:space-y-0">
                     <div className="flex-1">
                       <p className="font-medium text-foreground">Delete Account</p>
