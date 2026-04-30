@@ -3,8 +3,6 @@
 > React + TypeScript + Vite frontend for the Sbe Annex academic resource platform. Students can register, browse notes and past papers, read blogs targeted to their group, and submit reviews. Admins access a dedicated dashboard for content moderation and platform management.
 
 **Live site:** https://bbm.giftedtech.co.ke  
-**Backend API:** https://bbmback.giftedtech.co.ke  
-**Backend repo:** https://github.com/mauricegift/bbmannex-backend
 
 ---
 
@@ -149,8 +147,8 @@ src/
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/mauricegift/bbm-annex.git
-cd bbm-annex
+git clone https://github.com/mauricegift/bbm-annex-frontend.git
+cd bbm-annex-frontend
 
 # 2. Install dependencies (uses bun or npm)
 bun install
@@ -163,24 +161,6 @@ bun run dev
 # 4. Open in browser
 # http://localhost:8080
 ```
-
----
-
-## Environment & API Integration
-
-All API calls go to the backend. In **production on Vercel**, `vercel.json` proxies `/api/*` to `https://bbmback.giftedtech.co.ke/api/*` — no CORS issues, no hardcoded base URLs needed in the frontend code itself.
-
-```json
-// vercel.json (production only, not committed to the public repo)
-{
-  "rewrites": [
-    { "source": "/api/:path*", "destination": "https://bbmback.giftedtech.co.ke/api/:path*" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}
-```
-
-In development, make API calls directly to `http://localhost:3192/api/...` or point to the live API.
 
 ---
 
@@ -245,6 +225,4 @@ The project is deployed on **Vercel** connected to the `bbm-annex` GitHub repo.
 
 | Repo | Visibility | Contents | Purpose |
 |---|---|---|---|
-| `bbm-annex` | Private | Everything including `vercel.json` | Internal development + Vercel deploy source |
 | `bbm-annex-frontend` | Public | All source **except** `vercel.json` | Public open-source reference |
-| `bbmannex-backend` | Private | Full backend including `.env` | Backend source + secrets |
