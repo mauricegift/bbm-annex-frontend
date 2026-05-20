@@ -21,8 +21,8 @@
 
   ## Live Site
 
-  - **Frontend:** https://bbm.giftedtech.co.ke
-  - **API:** https://bbmback.giftedtech.co.ke/docs
+  - **Frontend:** https://sbe.gifted.co.ke
+  - **API:** https://bbmback.gifted.co.ke/docs
 
   ## Go to the New Repo
 
